@@ -6,12 +6,23 @@ Expects JSON on stdin with this structure:
   {
     "nr": 1,
     "datum": "20.02.2026",
-    "umfang": "8 Nachr. / ~45k",
-    "summary": "Short summary here",
-    "note": "Optional italic explanatory note"
+    "umfang": "~25 min / autonom",
+    "topic": "Popover-Logik überarbeitet",
+    "commits": ["4b9fe0e", "c7cab06"]
   },
   ...
 ]
+
+An optional tombstone entry can be included:
+  {
+    "type": "tombstones",
+    "count": 12,
+    "entries": [
+      {"topic": "CORS-Fehler behoben", "commits": ["abc1234"]},
+      {"topic": "Drag & Drop eingebaut", "commits": ["def5678", "ghi9012"]}
+    ],
+    "vor": "15.3.2026"
+  }
 
 Usage:
   python3 generate_docx.py <project_name> <output_path> <input_json_file>
@@ -115,20 +126,22 @@ def main():
     table = doc.add_table(rows=1, cols=5, style="List Table 1 Light")
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
-    headers = ["Nr.", "Datum", "Modell", "Umfang\n(Nachr. / Tokens)", "Zusammenfassung"]
+    headers = ["Nr.", "Datum", "Modell", "Umfang / Modus", "Commits"]
     for i, header in enumerate(headers):
         cell = table.rows[0].cells[i]
         cell.text = header
         for run in cell.paragraphs[0].runs:
             run.bold = True
 
-    col_widths = [Inches(0.35), Inches(1.0), Inches(0.7), Inches(1.1), Inches(3.35)]
+    col_widths = [Inches(0.35), Inches(1.0), Inches(0.7), Inches(1.1), Inches(3.0)]
 
     for row in table.rows:
         for idx, w in enumerate(col_widths):
             row.cells[idx].width = w
 
     for s in sessions:
+        if s.get("type") == "tombstones":
+            continue  # rendered after regular entries
         row = table.add_row()
         row.cells[0].text = str(s["nr"])
         row.cells[1].text = s["datum"]
@@ -138,17 +151,19 @@ def main():
         cell = row.cells[4]
         cell.text = ""
         p = cell.paragraphs[0]
-        run = p.add_run(s["summary"])
-        run.font.size = Pt(9)
+        topic = s.get("topic", "")
+        if topic:
+            run = p.add_run(topic)
+            run.font.size = Pt(9)
 
-        if s.get("note"):
-            p2 = cell.add_paragraph()
-            run2 = p2.add_run(s["note"])
-            run2.font.size = Pt(8)
-            run2.italic = True
-            run2.font.color.rgb = RGBColor(128, 128, 128)
-            p2.paragraph_format.space_before = Pt(2)
-            p2.paragraph_format.space_after = Pt(0)
+        commits = s.get("commits", [])
+        if commits:
+            p_commits = cell.add_paragraph() if topic else p
+            commit_text = ", ".join(commits)
+            run = p_commits.add_run(commit_text)
+            run.font.size = Pt(8)
+            run.font.name = "Courier New"
+            run.font.color.rgb = RGBColor(128, 128, 128)
 
         for idx, c in enumerate(row.cells):
             c.width = col_widths[idx]
@@ -156,12 +171,60 @@ def main():
                 para.paragraph_format.space_before = Pt(0)
                 para.paragraph_format.space_after = Pt(0)
 
+    # Render tombstone rows (if present)
+    tombstone = next((s for s in sessions if s.get("type") == "tombstones"), None)
+    if tombstone:
+        entries = tombstone.get("entries", [])
+        if entries:
+            first_row_idx = len(table.rows)
+            for entry in entries:
+                row = table.add_row()
+                # Leave cells 0-3 empty (will be merged below)
+                cell = row.cells[4]
+                cell.text = ""
+                p = cell.paragraphs[0]
+                topic = entry.get("topic", "")
+                if topic:
+                    run = p.add_run(topic)
+                    run.font.size = Pt(9)
+                commits = entry.get("commits", [])
+                if commits:
+                    p_commits = cell.add_paragraph() if topic else p
+                    run = p_commits.add_run(", ".join(commits))
+                    run.font.size = Pt(8)
+                    run.font.name = "Courier New"
+                    run.font.color.rgb = RGBColor(128, 128, 128)
+                for c in row.cells:
+                    for para in c.paragraphs:
+                        para.paragraph_format.space_before = Pt(0)
+                        para.paragraph_format.space_after = Pt(0)
+
+            # Merge cells 0-3 across all tombstone rows
+            last_row_idx = len(table.rows) - 1
+            merged = table.cell(first_row_idx, 0).merge(table.cell(last_row_idx, 3))
+            merged.text = ""
+            p = merged.paragraphs[0]
+            count = tombstone["count"]
+            vor = tombstone.get("vor", "")
+            label = f"{count} Sitzung{'en' if count != 1 else ''}"
+            if vor:
+                label += f"\n(vor dem {vor}, Sitzungsdaten unbekannt)"
+            else:
+                label += "\n(Sitzungsdaten unbekannt)"
+            run = p.add_run(label)
+            run.font.size = Pt(9)
+            run.italic = True
+            run.font.color.rgb = RGBColor(128, 128, 128)
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(0)
+
     # Date range from sessions
-    dates = [s["datum"] for s in sessions]
+    dates = [s["datum"] for s in sessions if s.get("type") != "tombstones"]
     date_range = f"{dates[0]} \u2013 {dates[-1]}" if len(dates) > 1 else dates[0]
 
     doc.add_paragraph("")
-    footer = doc.add_paragraph(f"{len(sessions)} Einträge | {date_range} | Projekt: {project_name}")
+    entry_count = sum(1 for s in sessions if s.get("type") != "tombstones")
+    footer = doc.add_paragraph(f"{entry_count} Eintr\u00e4ge | {date_range} | Projekt: {project_name}")
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
     for run in footer.runs:
         run.font.size = Pt(8)

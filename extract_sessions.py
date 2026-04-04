@@ -5,6 +5,9 @@ import json
 import sys
 import os
 import glob
+from datetime import datetime
+
+PAUSE_THRESHOLD_SECONDS = 300  # 5 minutes
 
 
 def parse_session(filepath):
@@ -30,6 +33,10 @@ def parse_session(filepath):
                     timestamps.append(ts)
 
             msg = obj.get("message", {})
+            ts = msg.get("timestamp")
+            if ts:
+                timestamps.append(ts)
+
             model = msg.get("model", "")
             if model and model != "<synthetic>":
                 models.add(model)
@@ -42,7 +49,6 @@ def parse_session(filepath):
             if obj.get("type") == "user":
                 content = msg.get("content", "")
                 if isinstance(content, str) and content.strip():
-                    timestamps.append(msg.get("timestamp", ""))
                     user_msgs.append(content.strip())
                 elif isinstance(content, list):
                     for part in content:
@@ -51,7 +57,30 @@ def parse_session(filepath):
 
     timestamps = [t for t in timestamps if t]
     model = format_model(models)
-    return timestamps, user_msgs, total_input + total_output, model
+    active_mins = compute_active_minutes(timestamps)
+    return timestamps, user_msgs, total_input + total_output, model, active_mins
+
+
+def compute_active_minutes(timestamps):
+    """Sum gaps between consecutive timestamps that are under the pause threshold."""
+    if len(timestamps) < 2:
+        return 0
+    parsed = sorted(datetime.fromisoformat(t) for t in timestamps)
+    total_seconds = 0
+    for i in range(1, len(parsed)):
+        delta = (parsed[i] - parsed[i - 1]).total_seconds()
+        if delta < PAUSE_THRESHOLD_SECONDS:
+            total_seconds += delta
+    return round(total_seconds / 60)
+
+
+def format_active_time(minutes):
+    if minutes < 1:
+        return "<1 min"
+    elif minutes < 60:
+        return f"~{minutes} min"
+    else:
+        return f"~{minutes / 60:.1f} h"
 
 
 MODEL_DISPLAY = {
@@ -111,7 +140,7 @@ def main():
         if current_session and session_id == current_session:
             continue
 
-        timestamps, user_msgs, total_tokens, model = parse_session(filepath)
+        timestamps, user_msgs, total_tokens, model, active_mins = parse_session(filepath)
         trivial, substantive = is_trivial(user_msgs)
 
         if trivial or not timestamps:
@@ -125,14 +154,48 @@ def main():
             "first_ts": first_ts,
             "last_ts": last_ts,
             "model": model,
-            "tokens": format_tokens(total_tokens),
+            "active_time": format_active_time(active_mins),
+            "active_minutes": active_mins,
             "tokens_raw": total_tokens,
             "message_count": len(substantive),
             "user_messages": [m[:300] for m in substantive],
         })
 
     sessions.sort(key=lambda s: s["first_ts"])
-    print(json.dumps(sessions, indent=2, ensure_ascii=False))
+
+    # Detect tombstones: directories without matching JSONL files
+    jsonl_ids = {os.path.basename(f).replace(".jsonl", "") for f in files}
+    if current_session:
+        jsonl_ids.add(current_session)
+    all_dirs = [
+        d for d in os.listdir(session_dir)
+        if os.path.isdir(os.path.join(session_dir, d))
+        and d not in ("__pycache__",)
+    ]
+    orphaned = [d for d in all_dirs if d not in jsonl_ids]
+
+    tombstones = None
+    if orphaned:
+        timestamps = []
+        for d in orphaned:
+            dir_path = os.path.join(session_dir, d)
+            stat = os.stat(dir_path)
+            try:
+                ts = stat.st_birthtime  # macOS
+            except AttributeError:
+                ts = stat.st_mtime
+            timestamps.append(datetime.fromtimestamp(ts))
+        timestamps.sort()
+        tombstones = {
+            "count": len(orphaned),
+            "first_ts": timestamps[0].isoformat(),
+            "last_ts": timestamps[-1].isoformat(),
+        }
+
+    output = {"sessions": sessions}
+    if tombstones:
+        output["tombstones"] = tombstones
+    print(json.dumps(output, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":

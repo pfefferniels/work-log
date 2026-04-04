@@ -5,13 +5,13 @@ Wird Künstliche Intelligenz im wissenschaftlichen Kontext verwendet, so muss ih
 Der Skill produziert ein Word-Dokument aus den Coding-Sessions, die lokal gefunden wurden (Claude Code und OpenAI Codex). Themen werden sitzungsübergreifend zusammengefasst. Das Word-Dokument enthält folgende Spalten:
 
 
-| Nr. | Datum | Modell | Umfang (Nachr. / Tokens) | Zusammenfassung |
-|-----|-------|--------|--------------------------|-----------------|
+| Nr. | Datum | Modell | Umfang / Modus | Commits |
+|-----|-------|--------|----------------|---------|
 
 - **Datum**: einzelner Tag oder Zeitraum (z.B. "22.–23.03.2026")
 - **Modell**: Das verwendete Sprachmodell (z.B. "Opus 4.6" oder "GPT-5.4")
-- **Umfang**: Anzahl der Nachrichten sowie der verwendeten Tokens (e.g. "8 / ~45k"). Dadurch soll die Komplexität und das "Hin- und Her" einer Sitzung beschrieben werden.
-- **Zusammenfassung**. Bei komplexeren Bearbeitungen kann noch eine kleine Notiz hinzugefügt werden.
+- **Umfang / Modus**: Aktive Arbeitszeit und Interaktionsmodus (z.B. "~25 min / autonom"). Die vier Modi sind: *dialogisch* (viel Hin und Her), *autonom* (Modell arbeitet selbstständig), *explorativ* (Recherche, keine Änderungen), *iterativ* (wiederholte Versuch-Fehler-Zyklen). Pausen über 5 Minuten werden nicht mitgezählt.
+- **Commits**: Kurze Themenzeile (3–5 Wörter, verbal formuliert, aus den Commit-Messages abgeleitet) sowie die zugehörigen Commit-Hashes.
 
 Die Einträge sind nach absteigender Komplexität sortiert.
 
@@ -41,9 +41,18 @@ In Claude Code, run:
 /work-log
 ```
 
+## Hinweis: Session-Dateien aufbewahren
+
+Claude Code löscht JSONL-Sitzungsdateien standardmäßig nach 30 Tagen. Um die Dateien dauerhaft zu behalten, in `~/.claude/settings.json` hinzufügen:
+
+```json
+{
+  "cleanupPeriodDays": 99999
+}
+```
+
+
 ## Requirements
 
 - Python 3
 - `python-docx` (auto-installed if missing)
-
-

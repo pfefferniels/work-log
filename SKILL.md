@@ -19,7 +19,7 @@ Run the extraction script. Replace `<session-dir>` with `~/.claude/projects/<pro
 python3 ~/.claude/skills/work-log/extract_sessions.py <session-dir> <current-session-id>
 ```
 
-This outputs JSON with timestamps, model name, token usage, message counts, and user messages for each non-trivial session.
+This outputs JSON with `sessions` (timestamps, model name, active time, token usage, message counts, user messages) and optionally `tombstones` (count and date range of sessions whose JSONL files were deleted by Claude Code's cleanup). Active time is computed by summing gaps between consecutive messages that are under 5 minutes (longer gaps are treated as pauses).
 
 #### Agent 2: Codex sessions (if ~/.codex exists)
 
@@ -31,9 +31,17 @@ python3 ~/.claude/skills/work-log/extract_codex_sessions.py <cwd-pattern> [addit
 
 Example: `python3 ~/.claude/skills/work-log/extract_codex_sessions.py mpm-desk mpmify`
 
-This queries `~/.codex/state_5.sqlite` and parses rollout JSONL files for user messages and model info.
+This queries `~/.codex/state_5.sqlite` and parses rollout JSONL files for user messages, model info, and active time (using the same 5-minute pause threshold as Claude Code).
 
 Wait for both agents to complete, then proceed with the combined results.
+
+#### Git log extraction (run alongside the agents above)
+
+Extract the project's git history covering the same time range as the sessions:
+
+```
+git log --format="%h %aI %s" --all --since="<earliest-session-date>"
+```
 
 ### Step 2: Review, cluster by topic, and curate
 
@@ -42,8 +50,16 @@ Review the extracted data from both sources and **cluster by work topic**, not b
 - A single session covering multiple topics → split into separate entries
 - The same topic worked on across multiple sessions → merge into one entry with a date range
 - Exclude purely technical work (only commit & push, port conflicts, running tests without context)
-- Attribute user messages and tokens to each topic (estimate when a session covers multiple topics)
+- Attribute active time to each topic: for multi-session topics, **sum** the active time from all contributing sessions. When a single session covers multiple topics, estimate proportionally.
+- Determine the interaction mode for each topic: **dialogisch**, **autonom**, **explorativ**, or **iterativ** — based on the ratio of user/assistant messages, tool call patterns (reads vs. writes), and whether retry cycles occurred
 - Use the `model` field from extraction output for the "modell" column
+
+**Associate commits with topics:** Match commits from the git log to topics based on:
+1. Timestamp overlap (commit author date falls within a session's time range)
+2. Content match (commit message relates to the session's topic)
+3. **Important:** If changes were coded in session A but committed in session B, attribute the commit to session A (where the work was done), not session B. Use the session content (user messages, tool calls) to determine where work actually happened.
+
+Topics that resulted in no commits may be omitted or kept with an empty commits list — use judgment based on whether the work is worth documenting.
 
 ### Step 3: Write summaries and generate DOCX
 
@@ -51,11 +67,28 @@ For each topic, create an entry with:
 - **nr**: Sequential number
 - **datum**: German date format without leading zeros (D.M.YYYY). For multi-day topics use ranges (e.g. 6.–7.3.2026)
 - **modell**: Model name from extraction (e.g. "Opus 4.6", "GPT-5.3")
-- **umfang**: Combo of user message count and tokens, e.g. "8 / ~45k" (header already labels the units)
-- **summary**: Max 10 words, in **German** — but keep technical terms in English as you would in a German technical text. Do NOT translate: library/tool names, API names, programming concepts, established CS terms (e.g. "Performance Profiling", "Popover", "Clean Code", "Context Menu", "DnD", "Deployment", "Bugfix"). DO translate: ordinary words that have natural German equivalents (e.g. "Darstellung" not "Display", "Sichtbarkeit" not "Visibility", "Verkettete Regionen" not "Chained Regions", "Behebung" not "Fix").
-- **note** (optional, use sparingly): Brief italic explanatory detail — only include when the summary alone would be unclear to a reader unfamiliar with the project (e.g. explaining *why* something was done, or clarifying an ambiguous technical term). Most entries should have NO note. When in doubt, leave it out.
+- **umfang**: Active time and interaction mode, e.g. "~25 min / autonom". The four modes are:
+  - **dialogisch** — high ratio of user-to-assistant messages, corrections, short exchanges
+  - **autonom** — few user messages, long assistant runs with many tool calls
+  - **explorativ** — lots of reads/searches, few or no edits/writes
+  - **iterativ** — repeated edit → error → fix cycles, retries
+- **topic**: 3–5 words, in **German**, verb-centered (no Nominalstil). Derived from the associated commit messages. Keep technical terms in English (same rules as before). Examples: "Popover-Logik überarbeitet", "CORS-Fehler behoben", "Drag & Drop eingebaut" — not "Überarbeitung der Popover-Logik".
+- **commits**: List of short commit hashes (7 chars) associated with this topic. Empty list if no commits resulted from the work.
 
-Order entries by descending complexity (token count as primary sort key) so the most substantial work appears first.
+Order entries by descending active time so the most substantial work appears first.
+
+**Tombstones:** If the extraction reported tombstones, use the tombstone date range and the git log to find commits that aren't already attributed to a reconstructed session. Cluster these commits by topic (derived from commit messages) and add a special entry at the end of the JSON array:
+```json
+{
+  "type": "tombstones",
+  "count": 12,
+  "entries": [
+    {"topic": "CORS-Fehler behoben", "commits": ["abc1234"]},
+    {"topic": "Drag & Drop eingebaut", "commits": ["def5678", "ghi9012"]}
+  ]
+}
+```
+Include a `vor` field with the start date of the earliest reconstructed session (German format, e.g. "15.3.2026") — since cleanup deletes oldest sessions first, all tombstones predate it. The generate script renders these as rows with topics and commits in the last column, while the first four columns (Nr., Datum, Modell, Umfang/Modus) are merged into a single cell across all tombstone rows.
 
 Write the curated JSON array to a temp file (avoids shell encoding issues with umlauts and special characters), then pass it to the generation script:
 
@@ -67,10 +100,10 @@ python3 ~/.claude/skills/work-log/generate_docx.py <project_name> <output_path> 
 
 - Heading: "Arbeitsverlauf – LLM-Coding × <project name>"
 - Font: Garamond throughout
-- Table style: "List Table 1 Light" (Listentabelle 1 Hell) with columns: Nr., Datum, Modell, Umfang (Nachr. / Tokens), Zusammenfassung
+- Table style: "List Table 1 Light" (Listentabelle 1 Hell) with columns: Nr., Datum, Modell, Umfang / Modus, Commits
 - Modell column: model display name (e.g. "Opus 4.6", "GPT-5.3")
-- Umfang column: message count + token count (e.g. "8 / ~45k") — header already explains the units, so keep cell values short
-- Summary column: 9pt font; explanatory notes: 8pt italic gray
+- Umfang / Modus column: active time + interaction mode (e.g. "~25 min / autonom")
+- Commits column: topic line in 9pt Garamond, then commit hashes in 8pt gray monospace (Courier New)
 - Footer: total entry count, date range, project name
 - Use proper German umlauts (ä, ö, ü, ß) — do NOT use ae/oe/ue substitutions
 - Save to the project root directory

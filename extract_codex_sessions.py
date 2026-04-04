@@ -8,13 +8,41 @@ import sqlite3
 from datetime import datetime
 
 
-def format_tokens(total):
-    if total < 1000:
-        return f"{total}"
-    elif total < 1_000_000:
-        return f"~{total / 1000:.0f}k"
+PAUSE_THRESHOLD_SECONDS = 300  # 5 minutes
+
+
+def format_active_time(minutes):
+    if minutes < 1:
+        return "<1 min"
+    elif minutes < 60:
+        return f"~{minutes} min"
     else:
-        return f"~{total / 1_000_000:.1f}M"
+        return f"~{minutes / 60:.1f} h"
+
+
+def compute_active_minutes(rollout_path):
+    """Sum gaps between consecutive event timestamps under the pause threshold."""
+    if not os.path.exists(rollout_path):
+        return 0
+    timestamps = []
+    with open(rollout_path) as fh:
+        for line in fh:
+            try:
+                obj = json.loads(line.strip())
+                ts = obj.get("timestamp")
+                if ts:
+                    timestamps.append(ts)
+            except (json.JSONDecodeError, KeyError):
+                pass
+    if len(timestamps) < 2:
+        return 0
+    parsed = sorted(datetime.fromisoformat(t.replace("Z", "+00:00")) for t in timestamps)
+    total_seconds = 0
+    for i in range(1, len(parsed)):
+        delta = (parsed[i] - parsed[i - 1]).total_seconds()
+        if delta < PAUSE_THRESHOLD_SECONDS:
+            total_seconds += delta
+    return round(total_seconds / 60)
 
 
 def extract_user_messages(rollout_path):
@@ -103,13 +131,15 @@ def main():
         model = extract_model(rollout_path)
         created_dt = datetime.fromtimestamp(created)
         updated_dt = datetime.fromtimestamp(updated)
+        active_mins = compute_active_minutes(rollout_path)
 
         sessions.append({
             "session_id": tid,
             "first_ts": created_dt.isoformat(),
             "last_ts": updated_dt.isoformat(),
             "model": model,
-            "tokens": format_tokens(tokens),
+            "active_time": format_active_time(active_mins),
+            "active_minutes": active_mins,
             "tokens_raw": tokens,
             "message_count": len(user_msgs),
             "user_messages": [m[:300] for m in user_msgs],
