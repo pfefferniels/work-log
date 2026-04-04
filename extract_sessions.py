@@ -76,11 +76,11 @@ def compute_active_minutes(timestamps):
 
 def format_active_time(minutes):
     if minutes < 1:
-        return "<1 min"
+        return "<1\u00a0min"
     elif minutes < 60:
-        return f"~{minutes} min"
+        return f"~{minutes}\u00a0min"
     else:
-        return f"~{minutes / 60:.1f} h"
+        return f"~{minutes / 60:.1f}\u00a0h"
 
 
 MODEL_DISPLAY = {

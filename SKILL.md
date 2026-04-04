@@ -65,9 +65,9 @@ Topics that resulted in no commits may be omitted or kept with an empty commits 
 
 For each topic, create an entry with:
 - **nr**: Sequential number
-- **datum**: German date format without leading zeros (D.M.YYYY). For multi-day topics use ranges (e.g. 6.–7.3.2026)
+- **datum**: German date format without leading zeros (D.M.YYYY). For multi-day topics use ranges (e.g. 6.–7.3.2026).
 - **modell**: Model name from extraction (e.g. "Opus 4.6", "GPT-5.3")
-- **umfang**: Active time and interaction mode, e.g. "~25 min / autonom". The four modes are:
+- **umfang**: Interaction mode and active time, e.g. "iterativ, ~30\u00a0min". The four modes are:
   - **dialogisch** — high ratio of user-to-assistant messages, corrections, short exchanges
   - **autonom** — few user messages, long assistant runs with many tool calls
   - **explorativ** — lots of reads/searches, few or no edits/writes
@@ -83,12 +83,12 @@ Order entries by descending active time so the most substantial work appears fir
   "type": "tombstones",
   "count": 12,
   "entries": [
-    {"topic": "CORS-Fehler behoben", "commits": ["abc1234"]},
-    {"topic": "Drag & Drop eingebaut", "commits": ["def5678", "ghi9012"]}
+    {"nr": 8, "datum": "vor dem 1.3.2026", "topic": "CORS-Fehler behoben", "commits": ["abc1234"]},
+    {"nr": 9, "datum": "vor dem 15.3.2026", "topic": "Drag & Drop eingebaut", "commits": ["def5678", "ghi9012"]}
   ]
 }
 ```
-Include a `vor` field with the start date of the earliest reconstructed session (German format, e.g. "15.3.2026") — since cleanup deletes oldest sessions first, all tombstones predate it. The generate script renders these as rows with topics and commits in the last column, while the first four columns (Nr., Datum, Modell, Umfang/Modus) are merged into a single cell across all tombstone rows.
+Each entry gets its own `datum` — use "vor dem [date]" where the date is the author date of the earliest commit in that topic group (the work must have happened before the commit). The generate script renders Nr., Datum, and Commits per-row, while Modell and Umfang/Modus are merged across all tombstone rows showing the session count and "(unbekannt)".
 
 Write the curated JSON array to a temp file (avoids shell encoding issues with umlauts and special characters), then pass it to the generation script:
 
@@ -100,9 +100,9 @@ python3 ~/.claude/skills/work-log/generate_docx.py <project_name> <output_path> 
 
 - Heading: "Arbeitsverlauf – LLM-Coding × <project name>"
 - Font: Garamond throughout
-- Table style: "List Table 1 Light" (Listentabelle 1 Hell) with columns: Nr., Datum, Modell, Umfang / Modus, Commits
+- Table style: "List Table 1 Light" (Listentabelle 1 Hell) with columns: Nr., Datum, Modell, Modus und Umfang, Commits
 - Modell column: model display name (e.g. "Opus 4.6", "GPT-5.3")
-- Umfang / Modus column: active time + interaction mode (e.g. "~25 min / autonom")
+- Modus und Umfang column: interaction mode + active time (e.g. "iterativ, ~30\u00a0min")
 - Commits column: topic line in 9pt Garamond, then commit hashes in 8pt gray monospace (Courier New)
 - Footer: total entry count, date range, project name
 - Use proper German umlauts (ä, ö, ü, ß) — do NOT use ae/oe/ue substitutions

@@ -6,7 +6,7 @@ Expects JSON on stdin with this structure:
   {
     "nr": 1,
     "datum": "20.02.2026",
-    "umfang": "~25 min / autonom",
+    "umfang": "autonom, ~25\u00a0min",
     "topic": "Popover-Logik überarbeitet",
     "commits": ["4b9fe0e", "c7cab06"]
   },
@@ -18,10 +18,9 @@ An optional tombstone entry can be included:
     "type": "tombstones",
     "count": 12,
     "entries": [
-      {"topic": "CORS-Fehler behoben", "commits": ["abc1234"]},
-      {"topic": "Drag & Drop eingebaut", "commits": ["def5678", "ghi9012"]}
-    ],
-    "vor": "15.3.2026"
+      {"nr": 8, "datum": "vor dem 1.3.2026", "topic": "CORS-Fehler behoben", "commits": ["abc1234"]},
+      {"nr": 9, "datum": "vor dem 15.3.2026", "topic": "Drag & Drop eingebaut", "commits": ["def5678", "ghi9012"]}
+    ]
   }
 
 Usage:
@@ -30,6 +29,7 @@ Usage:
 """
 
 import json
+import subprocess
 import sys
 from copy import deepcopy
 
@@ -126,18 +126,26 @@ def main():
     table = doc.add_table(rows=1, cols=5, style="List Table 1 Light")
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
-    headers = ["Nr.", "Datum", "Modell", "Umfang / Modus", "Commits"]
+    # Set column widths via tblGrid (percentage-based, adapts to page)
+    # Nr:4%, Datum:14%, Modell:10%, Umfang/Modus:19%, Commits:53%
+    tbl_grid = table._tbl.find(qn("w:tblGrid"))
+    if tbl_grid is not None:
+        table._tbl.remove(tbl_grid)
+    tbl_grid = etree.SubElement(table._tbl, qn("w:tblGrid"))
+    grid_widths = [363, 1270, 907, 1724, 4808]  # in twips, total ~9072 (~6.3")
+    for w in grid_widths:
+        col = etree.SubElement(tbl_grid, qn("w:gridCol"))
+        col.set(qn("w:w"), str(w))
+    # Insert tblGrid right after tblPr
+    tbl_pr = table._tbl.tblPr
+    tbl_pr.addnext(tbl_grid)
+
+    headers = ["Nr.", "Datum", "Modell", "Modus und Umfang", "Commits"]
     for i, header in enumerate(headers):
         cell = table.rows[0].cells[i]
         cell.text = header
         for run in cell.paragraphs[0].runs:
             run.bold = True
-
-    col_widths = [Inches(0.35), Inches(1.0), Inches(0.7), Inches(1.1), Inches(3.0)]
-
-    for row in table.rows:
-        for idx, w in enumerate(col_widths):
-            row.cells[idx].width = w
 
     for s in sessions:
         if s.get("type") == "tombstones":
@@ -161,12 +169,11 @@ def main():
             p_commits = cell.add_paragraph() if topic else p
             commit_text = ", ".join(commits)
             run = p_commits.add_run(commit_text)
-            run.font.size = Pt(8)
+            run.font.size = Pt(7)
             run.font.name = "Courier New"
             run.font.color.rgb = RGBColor(128, 128, 128)
 
-        for idx, c in enumerate(row.cells):
-            c.width = col_widths[idx]
+        for c in row.cells:
             for para in c.paragraphs:
                 para.paragraph_format.space_before = Pt(0)
                 para.paragraph_format.space_after = Pt(0)
@@ -179,7 +186,9 @@ def main():
             first_row_idx = len(table.rows)
             for entry in entries:
                 row = table.add_row()
-                # Leave cells 0-3 empty (will be merged below)
+                row.cells[0].text = str(entry["nr"])
+                row.cells[1].text = entry.get("datum", "")
+                # Leave cells 2-3 empty (will be merged below)
                 cell = row.cells[4]
                 cell.text = ""
                 p = cell.paragraphs[0]
@@ -191,7 +200,7 @@ def main():
                 if commits:
                     p_commits = cell.add_paragraph() if topic else p
                     run = p_commits.add_run(", ".join(commits))
-                    run.font.size = Pt(8)
+                    run.font.size = Pt(7)
                     run.font.name = "Courier New"
                     run.font.color.rgb = RGBColor(128, 128, 128)
                 for c in row.cells:
@@ -199,22 +208,35 @@ def main():
                         para.paragraph_format.space_before = Pt(0)
                         para.paragraph_format.space_after = Pt(0)
 
-            # Merge cells 0-3 across all tombstone rows
+            # Add top border to first tombstone row as visual divider
+            W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            first_row = table.rows[first_row_idx]
+            for cell in first_row.cells:
+                tc_pr = cell._tc.get_or_add_tcPr()
+                borders = etree.SubElement(tc_pr, qn("w:tcBorders"))
+                top = etree.SubElement(borders, qn("w:top"))
+                top.set(qn("w:val"), "single")
+                top.set(qn("w:sz"), "4")
+                top.set(qn("w:space"), "0")
+                top.set(qn("w:color"), "666666")
+
+            # Merge cells 2-3 across all tombstone rows (keep Nr. and Datum separate)
             last_row_idx = len(table.rows) - 1
-            merged = table.cell(first_row_idx, 0).merge(table.cell(last_row_idx, 3))
+            merged = table.cell(first_row_idx, 2).merge(table.cell(last_row_idx, 3))
             merged.text = ""
             p = merged.paragraphs[0]
             count = tombstone["count"]
-            vor = tombstone.get("vor", "")
-            label = f"{count} Sitzung{'en' if count != 1 else ''}"
-            if vor:
-                label += f"\n(vor dem {vor}, Sitzungsdaten unbekannt)"
-            else:
-                label += "\n(Sitzungsdaten unbekannt)"
+            label = (
+                f"{count} Sitzung{'en' if count != 1 else ''}\n"
+                "(genauer Umfang unbekannt,\n"
+                "Verlauf rekonstruiert\n"
+                "aus Commits)"
+            )
             run = p.add_run(label)
-            run.font.size = Pt(9)
+            run.font.size = Pt(8)
             run.italic = True
             run.font.color.rgb = RGBColor(128, 128, 128)
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p.paragraph_format.space_before = Pt(0)
             p.paragraph_format.space_after = Pt(0)
 
@@ -232,6 +254,9 @@ def main():
 
     doc.save(output_path)
     print(f"Saved to {output_path}")
+
+    # Open the generated file
+    subprocess.Popen(["open", output_path])
 
 
 if __name__ == "__main__":
