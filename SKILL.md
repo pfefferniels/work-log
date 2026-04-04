@@ -7,29 +7,33 @@ Summarize all LLM coding session files (Claude Code + Codex) for the current pro
 
 ## Workflow
 
-### Step 1: Extract session data
+### Step 1: Extract session data (parallel agents)
 
-#### Claude Code sessions
+Launch **two agents in parallel** to extract Claude Code and Codex sessions simultaneously:
+
+#### Agent 1: Claude Code sessions
 
 Run the extraction script. Replace `<session-dir>` with `~/.claude/projects/<project-path>/` and `<current-session-id>` with this session's ID (from the JSONL filename):
 
 ```
-python3 ~/.claude/skills/document/extract_sessions.py <session-dir> <current-session-id>
+python3 ~/.claude/skills/work-log/extract_sessions.py <session-dir> <current-session-id>
 ```
 
 This outputs JSON with timestamps, model name, token usage, message counts, and user messages for each non-trivial session.
 
-#### Codex sessions (if ~/.codex exists)
+#### Agent 2: Codex sessions (if ~/.codex exists)
 
 Run the Codex extraction script with one or more cwd patterns that match the project:
 
 ```
-python3 ~/.claude/skills/document/extract_codex_sessions.py <cwd-pattern> [additional-patterns...]
+python3 ~/.claude/skills/work-log/extract_codex_sessions.py <cwd-pattern> [additional-patterns...]
 ```
 
-Example: `python3 ~/.claude/skills/document/extract_codex_sessions.py mpm-desk mpmify`
+Example: `python3 ~/.claude/skills/work-log/extract_codex_sessions.py mpm-desk mpmify`
 
 This queries `~/.codex/state_5.sqlite` and parses rollout JSONL files for user messages and model info.
+
+Wait for both agents to complete, then proceed with the combined results.
 
 ### Step 2: Review, cluster by topic, and curate
 
@@ -45,10 +49,10 @@ Review the extracted data from both sources and **cluster by work topic**, not b
 
 For each topic, create an entry with:
 - **nr**: Sequential number
-- **datum**: German date format (DD.MM.YYYY). For multi-day topics use ranges (e.g. 06.–07.03.2026)
+- **datum**: German date format without leading zeros (D.M.YYYY). For multi-day topics use ranges (e.g. 6.–7.3.2026)
 - **modell**: Model name from extraction (e.g. "Opus 4.6", "GPT-5.3")
 - **umfang**: Combo of user message count and tokens, e.g. "8 / ~45k" (header already labels the units)
-- **summary**: Max 10 words. Keep technical terms untranslated (e.g. Subsequence Matcher, LLM-Diff, Mood Chord)
+- **summary**: Max 10 words, in **German** — but keep technical terms in English as you would in a German technical text. Do NOT translate: library/tool names, API names, programming concepts, established CS terms (e.g. "Performance Profiling", "Popover", "Clean Code", "Context Menu", "DnD", "Deployment", "Bugfix"). DO translate: ordinary words that have natural German equivalents (e.g. "Darstellung" not "Display", "Sichtbarkeit" not "Visibility", "Verkettete Regionen" not "Chained Regions", "Behebung" not "Fix").
 - **note** (optional, use sparingly): Brief italic explanatory detail — only include when the summary alone would be unclear to a reader unfamiliar with the project (e.g. explaining *why* something was done, or clarifying an ambiguous technical term). Most entries should have NO note. When in doubt, leave it out.
 
 Order entries by descending complexity (token count as primary sort key) so the most substantial work appears first.
@@ -56,7 +60,7 @@ Order entries by descending complexity (token count as primary sort key) so the 
 Write the curated JSON array to a temp file (avoids shell encoding issues with umlauts and special characters), then pass it to the generation script:
 
 ```
-python3 ~/.claude/skills/document/generate_docx.py <project_name> <output_path> /tmp/sessions.json
+python3 ~/.claude/skills/work-log/generate_docx.py <project_name> <output_path> /tmp/sessions.json
 ```
 
 ## Output format
