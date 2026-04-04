@@ -10,12 +10,12 @@ A Claude Code skill that generates a DOCX work log from LLM coding sessions (Cla
 
 A DOCX table with columns:
 
-| Nr. | Datum | Modell | Umfang | Zusammenfassung |
-|-----|-------|--------|--------|-----------------|
+| Nr. | Datum | Modell | Umfang (Nachr. / Tokens) | Zusammenfassung |
+|-----|-------|--------|--------------------------|-----------------|
 
 - **Datum**: date or range (e.g. "22.–23.03.2026")
 - **Modell**: which model was used (e.g. "Opus 4.6", "GPT-5.4")
-- **Umfang**: user message count + token count (e.g. "8 Nachr. / ~45k")
+- **Umfang**: message count + token count (e.g. "8 / ~45k") — header explains the units
 - **Zusammenfassung**: topic summary + optional italic note
 
 Entries are sorted by descending complexity (token count).

@@ -115,7 +115,8 @@ def main():
     table = doc.add_table(rows=1, cols=5, style="List Table 1 Light")
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
-    for i, header in enumerate(["Nr.", "Datum", "Modell", "Umfang", "Zusammenfassung"]):
+    headers = ["Nr.", "Datum", "Modell", "Umfang\n(Nachr. / Tokens)", "Zusammenfassung"]
+    for i, header in enumerate(headers):
         cell = table.rows[0].cells[i]
         cell.text = header
         for run in cell.paragraphs[0].runs:

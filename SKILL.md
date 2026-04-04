@@ -1,5 +1,5 @@
 ---
-name: document
+name: work-log
 description: Summarize LLM coding session history as a topic-oriented docx table
 ---
 
@@ -47,9 +47,9 @@ For each topic, create an entry with:
 - **nr**: Sequential number
 - **datum**: German date format (DD.MM.YYYY). For multi-day topics use ranges (e.g. 06.–07.03.2026)
 - **modell**: Model name from extraction (e.g. "Opus 4.6", "GPT-5.3")
-- **umfang**: Combo of user message count and tokens, e.g. "8 Nachr. / ~45k"
+- **umfang**: Combo of user message count and tokens, e.g. "8 / ~45k" (header already labels the units)
 - **summary**: Max 10 words. Keep technical terms untranslated (e.g. Subsequence Matcher, LLM-Diff, Mood Chord)
-- **note** (optional): Brief italic explanatory detail
+- **note** (optional, use sparingly): Brief italic explanatory detail — only include when the summary alone would be unclear to a reader unfamiliar with the project (e.g. explaining *why* something was done, or clarifying an ambiguous technical term). Most entries should have NO note. When in doubt, leave it out.
 
 Order entries by descending complexity (token count as primary sort key) so the most substantial work appears first.
 
@@ -63,9 +63,9 @@ python3 ~/.claude/skills/document/generate_docx.py <project_name> <output_path> 
 
 - Heading: "Arbeitsverlauf – LLM-Coding × <project name>"
 - Font: Garamond throughout
-- Table style: "List Table 1 Light" (Listentabelle 1 Hell) with columns: Nr., Datum, Modell, Umfang, Zusammenfassung
+- Table style: "List Table 1 Light" (Listentabelle 1 Hell) with columns: Nr., Datum, Modell, Umfang (Nachr. / Tokens), Zusammenfassung
 - Modell column: model display name (e.g. "Opus 4.6", "GPT-5.3")
-- Umfang column: message count + token count (e.g. "8 Nachr. / ~45k")
+- Umfang column: message count + token count (e.g. "8 / ~45k") — header already explains the units, so keep cell values short
 - Summary column: 9pt font; explanatory notes: 8pt italic gray
 - Footer: total entry count, date range, project name
 - Use proper German umlauts (ä, ö, ü, ß) — do NOT use ae/oe/ue substitutions
