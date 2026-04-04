@@ -1,5 +1,9 @@
 # work-log
 
+Wird Künstliche Intelligenz im wissenschaftlichen Kontext verwendet, so muss ihre genaue Verwendungsweise nachgewiesen werden. Klassischerweise sehen die meisten Regeln vor, dass der genaue Prompt und der gesamte sich daran anschließende Chatverlauf angehängt wird. Diese Vorgehensweise ist allerdings beim Einsatz von Coding-Agenten wie Claude Code oder Codex nicht zielführend, da die Ausgaben in ihrem Umfang einerseits kaum durchschaubar sind und andererseits nicht jede Nachricht in ihrem genauen Wortlaut für die Dokumentation relevant ist. Der vorliegende Skill versucht dieses Problem zu lösen, indem sämtliche Sitzungen thematisch und ihrem Umfang nach tabellarisch zusammengefasst werden. Die so produzierte Übersicht kann anschließend als Referenz wissenschaftlichen Arbeiten angehängt werden.
+
+---
+
 A Claude Code skill that generates a DOCX work log from LLM coding sessions (Claude Code + OpenAI Codex). Instead of listing sessions chronologically, it clusters work by **topic** — splitting multi-topic sessions and merging cross-session work on the same topic.
 
 ## Output
