@@ -51,7 +51,7 @@ Review the extracted data from both sources and **cluster by work topic**, not b
 - The same topic worked on across multiple sessions → merge into one entry with a date range
 - Exclude purely technical work (only commit & push, port conflicts, running tests without context)
 - Attribute active time to each topic: for multi-session topics, **sum** the active time from all contributing sessions. When a single session covers multiple topics, estimate proportionally.
-- Determine the interaction mode for each topic: **dialogisch**, **autonom**, **explorativ**, or **iterativ** — based on the ratio of user/assistant messages, tool call patterns (reads vs. writes), and whether retry cycles occurred
+- Determine the interaction mode for each topic: **dialogisch**, **autonom**, or **explorativ** — based on the ratio of user/assistant messages and tool call patterns (reads vs. writes)
 - Use the `model` field from extraction output for the "modell" column
 
 **Associate commits with topics:** Match commits from the git log to topics based on:
@@ -67,11 +67,10 @@ For each topic, create an entry with:
 - **nr**: Sequential number
 - **datum**: German date format without leading zeros (D.M.YYYY). For multi-day topics use ranges (e.g. 6.–7.3.2026).
 - **modell**: Model name from extraction (e.g. "Opus 4.6", "GPT-5.3")
-- **umfang**: Interaction mode and active time, e.g. "iterativ, ~30\u00a0min". The four modes are:
-  - **dialogisch** — high ratio of user-to-assistant messages, corrections, short exchanges
-  - **autonom** — few user messages, long assistant runs with many tool calls
-  - **explorativ** — lots of reads/searches, few or no edits/writes
-  - **iterativ** — repeated edit → error → fix cycles, retries
+- **umfang**: Interaction mode and active time, e.g. "autonom, ~30\u00a0min". The three modes are:
+  - **dialogisch** — lots of back-and-forth, user actively steering, corrections
+  - **autonom** — model works independently, few user messages, long runs with many tool calls
+  - **explorativ** — reading, searching, investigating; few or no edits/writes
 - **topic**: 3–5 words, in **German**, verb-centered (no Nominalstil). Derived from the associated commit messages. Keep technical terms in English (same rules as before). Examples: "Popover-Logik überarbeitet", "CORS-Fehler behoben", "Drag & Drop eingebaut" — not "Überarbeitung der Popover-Logik".
 - **commits**: List of short commit hashes (7 chars) associated with this topic. Empty list if no commits resulted from the work.
 
@@ -102,7 +101,7 @@ python3 ~/.claude/skills/work-log/generate_docx.py <project_name> <output_path> 
 - Font: Garamond throughout
 - Table style: "List Table 1 Light" (Listentabelle 1 Hell) with columns: Nr., Datum, Modell, Modus und Umfang, Commits
 - Modell column: model display name (e.g. "Opus 4.6", "GPT-5.3")
-- Modus und Umfang column: interaction mode + active time (e.g. "iterativ, ~30\u00a0min")
+- Modus und Umfang column: interaction mode + active time (e.g. "autonom, ~30\u00a0min")
 - Commits column: topic line in 9pt Garamond, then commit hashes in 8pt gray monospace (Courier New)
 - Footer: total entry count, date range, project name
 - Use proper German umlauts (ä, ö, ü, ß) — do NOT use ae/oe/ue substitutions

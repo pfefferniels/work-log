@@ -10,7 +10,7 @@ Der Skill produziert ein Word-Dokument aus den Coding-Sessions, die lokal gefund
 
 - **Datum**: einzelner Tag oder Zeitraum (z.B. "22.–23.03.2026")
 - **Modell**: Das verwendete Sprachmodell (z.B. "Opus 4.6" oder "GPT-5.4")
-- **Modus und Umfang**: Aktive Arbeitszeit und Interaktionsmodus (z.B. "iterativ, ~30\u00a0min"). Die vier Modi sind: *dialogisch* (viel Hin und Her), *autonom* (Modell arbeitet selbstständig), *explorativ* (Recherche, keine Änderungen), *iterativ* (wiederholte Versuch-Fehler-Zyklen). Pausen über 5 Minuten werden nicht mitgezählt.
+- **Modus und Umfang**: Aktive Arbeitszeit und Interaktionsmodus (z.B. "autonom, ~30\u00a0min"). Die drei Modi sind: *dialogisch* (viel Hin und Her), *autonom* (Modell arbeitet selbstständig), *explorativ* (Recherche, keine Änderungen). Pausen über 5 Minuten werden nicht mitgezählt.
 - **Commits**: Kurze Themenzeile (3–5 Wörter, verbal formuliert, aus den Commit-Messages abgeleitet) sowie die zugehörigen Commit-Hashes.
 
 Die Einträge sind nach absteigender Komplexität sortiert.

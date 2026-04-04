@@ -6,7 +6,7 @@ Expects JSON on stdin with this structure:
   {
     "nr": 1,
     "datum": "20.02.2026",
-    "umfang": "autonom, ~25\u00a0min",
+    "umfang": "autonom, ~25\u00a0min",  # modes: dialogisch, autonom, explorativ
     "topic": "Popover-Logik überarbeitet",
     "commits": ["4b9fe0e", "c7cab06"]
   },
