@@ -242,11 +242,18 @@ def main():
 
     # Date range from sessions
     dates = [s["datum"] for s in sessions if s.get("type") != "tombstones"]
-    date_range = f"{dates[0]} \u2013 {dates[-1]}" if len(dates) > 1 else dates[0]
+    if not dates:
+        # Tombstone-only: collect dates from tombstone entries
+        for s in sessions:
+            if s.get("type") == "tombstones":
+                dates = [e["datum"] for e in s.get("entries", [])]
+    date_range = f"{dates[0]} \u2013 {dates[-1]}" if len(dates) > 1 else (dates[0] if dates else "unbekannt")
 
     doc.add_paragraph("")
     entry_count = sum(1 for s in sessions if s.get("type") != "tombstones")
-    footer = doc.add_paragraph(f"{entry_count} Eintr\u00e4ge | {date_range} | Projekt: {project_name}")
+    tombstone_entries = sum(len(s.get("entries", [])) for s in sessions if s.get("type") == "tombstones")
+    total_entries = entry_count + tombstone_entries
+    footer = doc.add_paragraph(f"{total_entries} Eintr\u00e4ge | {date_range} | Projekt: {project_name}")
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
     for run in footer.runs:
         run.font.size = Pt(8)
