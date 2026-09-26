@@ -1,50 +1,71 @@
 # work-log
 
-A Claude Code skill that summarizes LLM coding sessions (Claude Code + Codex) into a topic-oriented Word document, suitable as an appendix for academic work that requires documentation of AI usage.
+A Claude Code skill that documents LLM-assisted coding as a LaTeX table, intended as an appendix for academic work that requires documentation of AI usage.
 
-When AI is used in an academic context, its exact usage must be documented. The common approach — appending the full prompt and chat history — doesn't work well with coding agents like Claude Code or Codex, where outputs are voluminous and not every message is relevant. This skill solves that by summarizing all sessions into a compact table grouped by topic.
+When AI is used in an academic context, its exact usage must be documented. The common approach, appending the full prompt and chat history, does not work well with coding agents like Claude Code or Codex, whose output is voluminous and mostly irrelevant for this purpose. This skill lists the **intentions** of the researcher instead: the goals pursued with the agent that ended in at least one git commit. An intention may span several sessions or occupy only part of one.
 
-The generated Word document contains the following columns:
+| Nr. | Zeitraum | Intention | Modell | Modus und Umfang | Commits |
+|-----|----------|-----------|--------|------------------|---------|
 
-| Nr. | Datum | Modell | Modus und Umfang | Commits |
-|-----|-------|--------|------------------|---------|
+- **Zeitraum**: first to last day of work on the intention, e.g. "22.–23.3.2026"
+- **Intention**: the goal, phrased from the researcher's side, e.g. "Undo und Redo im Editor ermöglichen"
+- **Modell**: the models that did the work, e.g. "Opus 4.6"
+- **Modus und Umfang**: interaction mode and active time, e.g. "autonom, ~30 min". Modes: *dialogisch* (back and forth), *autonom* (at least 25 tool calls per prompt), *explorativ* (under 5 % of tool calls edit files). Pauses of five minutes or more are not counted.
+- **Commits**: short hashes of the commits that realized the intention
 
-- **Datum**: Single date or range (e.g. "22.–23.03.2026")
-- **Modell**: The language model used (e.g. "Opus 4.6" or "GPT-5.3")
-- **Modus und Umfang**: Active working time and interaction mode (e.g. "autonom, ~30 min"). The three modes are: *dialogisch* (back-and-forth, user steering), *autonom* (model works independently), *explorativ* (reading/searching, no changes). Pauses over 5 minutes are excluded.
-- **Commits**: Short topic line (3–5 words, derived from commit messages) and associated commit hashes.
+Rows are sorted by active time. Commits from sessions whose transcripts Claude Code has already deleted can be listed in a separate block, reconstructed from the commit messages.
 
-Entries are sorted by descending active time.
+## How it works
+
+1. **Harvest.** All local Claude Code transcripts (every project directory, subagents included), Codex sessions and Claude Code cloud sessions are reduced to turns: one prompt of the researcher and the work until the next one. Only the prompts, timestamps, reply sizes and tool-call inputs are read, never tool output or reply text. Results are cached in `~/.cache/work-log/`.
+2. **Link.** Each `git commit` the agent ran is matched against the history of the repositories in scope by subject and author date, which survive renamed folders, rebases and squash merges. Commits made by hand are matched by time and edited files.
+3. **Dossier.** The sessions in scope are written out as sequences of prompts with the commits they led to.
+4. **Intentions.** Claude reads the dossier and groups turns into intentions (the guidance is in `SKILL.md`).
+5. **Render.** Periods, active time, models and modes are computed from the turns each intention names, and the table is written as LaTeX.
+
+Identifying intentions remains a judgement. The period and active time are computed, but they rest on that grouping.
 
 ## Installation
 
-Copy or symlink into your Claude Code skills directory:
-
 ```bash
-# Clone
 git clone https://github.com/pfefferniels/work-log.git
-
-# Symlink into Claude Code skills
 ln -s "$(pwd)/work-log" ~/.claude/skills/work-log
-```
-
-Or copy the files directly:
-
-```bash
-cp -r work-log ~/.claude/skills/work-log
 ```
 
 ## Usage
 
-In Claude Code, run:
+In Claude Code, inside the repository to document:
 
 ```
 /work-log
 ```
 
-## Note: Preserving session files
+The result is `arbeitsverlauf.tex`, a fragment for `\input` that needs `\usepackage{booktabs,longtable,array}`. The skill can also cover several repositories, or every repository you have worked in.
 
-Claude Code deletes session JSONL files after 30 days by default. To keep them indefinitely, add to `~/.claude/settings.json`:
+The scripts can be run directly:
+
+```bash
+python3 worklog.py dossier --repo ~/Projects/a --repo ~/Projects/b --name "Dissertation"
+python3 worklog.py render ~/.cache/work-log/runs/Dissertation --output arbeitsverlauf.tex
+```
+
+## Cloud sessions
+
+Cloud sessions are read from an undocumented beta API (see `cloud-sessions-api.md`) with the OAuth token Claude Code keeps in the macOS keychain. Claude Code's auto mode blocks such access by default. To allow it for this skill, add a rule to `~/.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(python3 ~/.claude/skills/work-log/worklog.py:*)"]
+  }
+}
+```
+
+Without it, run the dossier with `--no-cloud`.
+
+## Preserving session files
+
+Claude Code deletes transcripts after 30 days by default. To keep them, add to `~/.claude/settings.json`:
 
 ```json
 {
@@ -54,5 +75,5 @@ Claude Code deletes session JSONL files after 30 days by default. To keep them i
 
 ## Requirements
 
-- Python 3
-- `python-docx` (auto-installed if missing)
+- Python 3.11 or later, git, macOS (for the keychain; the local sources work elsewhere)
+- A LaTeX installation with `booktabs`, `longtable` and `array` to typeset the table

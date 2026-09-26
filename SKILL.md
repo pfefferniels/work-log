@@ -1,108 +1,88 @@
 ---
 name: work-log
-description: Summarize LLM coding session history as a topic-oriented docx table
+description: Document LLM-assisted coding as the researcher's intentions that led to git commits, rendered as a LaTeX table
 ---
 
-Summarize all LLM coding session files (Claude Code + Codex) for the current project directory into a topic-oriented table documenting the work timeline. The unit of one row is a **work topic**, not a session — a single session may produce multiple entries, and work on the same topic across sessions should be merged into one entry.
+The work log documents AI use in research code as a list of **intentions**: goals the researcher pursued with a coding agent that ended in at least one git commit. Each row names one intention, its period, the model, the mode and active time of the work, and the commits that realized it.
 
-## Workflow
+The sources are every local Claude Code transcript (all project directories, subagents included), Codex sessions, and Claude Code cloud sessions. Only the researcher's prompts, timestamps, reply sizes and tool-call inputs are read, never tool output or reply text. Sessions are tied to commits by commit subject and author date, not by directory, so renamed project folders and code moved between repositories are handled.
 
-### Step 1: Extract session data (parallel agents)
+## 1. Build the dossier
 
-Launch **two agents in parallel** to extract Claude Code and Codex sessions simultaneously:
-
-#### Agent 1: Claude Code sessions
-
-Run the extraction script. Replace `<session-dir>` with `~/.claude/projects/<project-path>/` and `<current-session-id>` with this session's ID (from the JSONL filename):
+The scope is the repository of the current working directory unless the user names others. Fetch first, so that commits made in cloud sessions are visible locally:
 
 ```
-python3 ~/.claude/skills/work-log/extract_sessions.py <session-dir> <current-session-id>
+git -C <repo> fetch --all --quiet
+python3 ~/.claude/skills/work-log/worklog.py dossier [--repo PATH ...] [--all] [--name NAME] [--since YYYY-MM-DD]
 ```
 
-This outputs JSON with `sessions` (timestamps, model name, active time, token usage, message counts, user messages) and optionally `tombstones` (count and date range of sessions whose JSONL files were deleted by Claude Code's cleanup). Active time is computed by summing gaps between consecutive messages that are under 5 minutes (longer gaps are treated as pauses).
+- `--repo` is repeatable; `--all` takes every repository a session ever ran in.
+- `--name` sets the project name in the heading (default: the repository names).
+- The first run parses all transcripts (about 20 s for 12 GB); later runs reuse a cache in `~/.cache/work-log/`.
+- If the command is denied because it reads the Claude Code OAuth token from the keychain (needed for cloud sessions), run it again with `--no-cloud` and tell the user which permission rule would allow it (see README).
 
-#### Agent 2: Codex sessions (if ~/.codex exists)
+The command prints the paths of `overview.md` and `part-NN.md` in its run directory. The overview lists the scope, how many commits were linked to sessions and how, notes about skipped sources, deleted transcripts, and the commits that might stem from them. Each part lists sessions chronologically: every turn (one prompt of the researcher and the work until the next) with its label, time, tool calls, edits, output tokens, the prompt, and the commits it produced.
 
-Run the Codex extraction script with one or more cwd patterns that match the project:
+## 2. Identify the intentions
 
-```
-python3 ~/.claude/skills/work-log/extract_codex_sessions.py <cwd-pattern> [additional-patterns...]
-```
+Read the overview, then every part. With more than one part, give each part to a subagent in parallel, pasting this section ("Identify the intentions") into its instructions, and ask for draft intentions in the JSON format below plus a note on intentions that seem to continue into a neighbouring part. Then merge the drafts yourself: join drafts that pursue the same goal across part boundaries, and even out granularity and wording.
 
-Example: `python3 ~/.claude/skills/work-log/extract_codex_sessions.py mpm-desk mpmify`
+### What counts as an intention
 
-This queries `~/.codex/state_5.sqlite` and parses rollout JSONL files for user messages, model info, and active time (using the same 5-minute pause threshold as Claude Code).
+An intention is a goal the researcher pursued with the agent, as they would explain it to a colleague: "Ich wollte …". Read it off the prompts. What the model did and what the commit messages say help to name it, but they are evidence, not the unit.
 
-Wait for both agents to complete, then proceed with the combined results.
+List an intention only if at least one of its turns produced a commit in scope. Conversations that ended without a commit are left out, unless they were the early part of an intention that later led to one; then their turns join that intention.
 
-#### Git log extraction (run alongside the agents above)
+### Granularity
 
-Extract the project's git history covering the same time range as the sessions:
+Aim for the level at which the researcher decided what to work on next.
 
-```
-git log --format="%h %aI %s" --all --since="<earliest-session-date>"
-```
+- A new intention begins when the researcher turns to a goal that would make sense on its own, even had the previous one never been pursued. Corrections, follow-up requests, fixes of what was just built, reviews, tests and "commit and push" belong to the intention they serve.
+- An intention can span sessions. Merge when a later session continues the same goal: an explicit continuation ("weiter mit", "continue", "as discussed"), the same issue or feature named, a plan made in one session and carried out in another, parallel sessions or agents working on parts of one goal. Sessions marked "no commit in scope" join an intention only when they clearly pursue it.
+- An intention can take up part of a session. Long sessions often hold several; split where the goal changes.
+- Too coarse: the phrase could be a project title ("mpm-desk weiterentwickeln"), or it needs "und" to join goals that are unrelated.
+- Too fine: the phrase names one step of a larger goal ("Button-Farbe anpassen" within a UI rework), unless that step was all the researcher wanted at the time.
+- Issue bullets and numbered tasks are separate intentions when each is a goal of its own, and one intention when they are steps toward one result.
+- Housekeeping (renaming, README, dependency updates, merges) joins the intention it served. It stands alone only when the researcher pursued it for its own sake; related chores then share one row ("Skill veröffentlichen und einrichten").
+- A commit may appear in several intentions when it bundles their results, which is common when a session ends with one "commit and push". Each turn belongs to one intention. A turn that genuinely served two may be listed in both, and its time is split between them.
+- Turns that belong to no intention (unrelated questions, abandoned attempts) are simply not assigned.
 
-### Step 2: Review, cluster by topic, and curate
+As a rough calibration, an intention spans a few to a few dozen turns and one to a handful of commits. A row with dozens of commits or a single short turn deserves a second look, though neither is wrong in itself.
 
-Review the extracted data from both sources and **cluster by work topic**, not by session:
-- Identify distinct topics/tasks across all sessions (e.g. "Instruction Popover", "Performance Optimization", "CORS Debugging")
-- A single session covering multiple topics → split into separate entries
-- The same topic worked on across multiple sessions → merge into one entry with a date range
-- Exclude purely technical work (only commit & push, port conflicts, running tests without context)
-- Attribute active time to each topic: for multi-session topics, **sum** the active time from all contributing sessions. When a single session covers multiple topics, estimate proportionally.
-- Determine the interaction mode for each topic: **dialogisch**, **autonom**, or **explorativ** — based on the ratio of user/assistant messages and tool call patterns (reads vs. writes)
-- Use the `model` field from extraction output for the "modell" column
+### Wording
 
-**Associate commits with topics:** Match commits from the git log to topics based on:
-1. Timestamp overlap (commit author date falls within a session's time range)
-2. Content match (commit message relates to the session's topic)
-3. **Important:** If changes were coded in session A but committed in session B, attribute the commit to session A (where the work was done), not session B. Use the session content (user messages, tool calls) to determine where work actually happened.
+German, as an infinitive phrase of 3–10 words that states the goal from the researcher's side, not what the model did. Verb-centred, no Nominalstil. Technical terms may stay English. Examples: "Undo und Redo im Editor ermöglichen", "Kontinuierliche Pedaldaten im Alignment berücksichtigen", "Abbildung zur Rollenproduktion nach neuer Vorlage umsetzen".
 
-Topics that resulted in no commits may be omitted or kept with an empty commits list — use judgment based on whether the work is worth documenting.
+### Reconstructed intentions
 
-### Step 3: Write summaries and generate DOCX
+If the overview lists deleted transcripts together with commits made in that period, group those commits by the goal their subjects suggest and add them as intentions with `"reconstructed": true` and no turns. Their period becomes "vor dem" plus the date of their earliest commit; model and extent stay empty.
 
-For each topic, create an entry with:
-- **nr**: Sequential number
-- **datum**: German date format without leading zeros (D.M.YYYY). For multi-day topics use ranges (e.g. 6.–7.3.2026).
-- **modell**: Model name from extraction (e.g. "Opus 4.6", "GPT-5.3")
-- **umfang**: Interaction mode and active time, e.g. "autonom, ~30\u00a0min". The three modes are:
-  - **dialogisch** — lots of back-and-forth, user actively steering, corrections
-  - **autonom** — model works independently, few user messages, long runs with many tool calls
-  - **explorativ** — reading, searching, investigating; few or no edits/writes
-- **topic**: 3–5 words, in **German**, verb-centered (no Nominalstil). Derived from the associated commit messages. Keep technical terms in English (same rules as before). Examples: "Popover-Logik überarbeitet", "CORS-Fehler behoben", "Drag & Drop eingebaut" — not "Überarbeitung der Popover-Logik".
-- **commits**: List of short commit hashes (7 chars) associated with this topic. Empty list if no commits resulted from the work.
+### Format
 
-Order entries by descending active time so the most substantial work appears first.
+Write `intentions.json` into the run directory:
 
-**Tombstones:** If the extraction reported tombstones, use the tombstone date range and the git log to find commits that aren't already attributed to a reconstructed session. Cluster these commits by topic (derived from commit messages) and add a special entry at the end of the JSON array:
 ```json
-{
-  "type": "tombstones",
-  "count": 12,
-  "entries": [
-    {"nr": 8, "datum": "vor dem 1.3.2026", "topic": "CORS-Fehler behoben", "commits": ["abc1234"]},
-    {"nr": 9, "datum": "vor dem 15.3.2026", "topic": "Drag & Drop eingebaut", "commits": ["def5678", "ghi9012"]}
-  ]
-}
-```
-Each entry gets its own `datum` — use "vor dem [date]" where the date is the author date of the earliest commit in that topic group (the work must have happened before the commit). The generate script renders Nr., Datum, and Commits per-row, while Modell and Umfang/Modus are merged across all tombstone rows showing the session count and "(unbekannt)".
-
-Write the curated JSON array to a temp file (avoids shell encoding issues with umlauts and special characters), then pass it to the generation script:
-
-```
-python3 ~/.claude/skills/work-log/generate_docx.py <project_name> <output_path> /tmp/sessions.json
+{"intentions": [
+  {"intention": "Undo und Redo im Editor ermöglichen", "turns": ["S12.3-9", "S15"], "commits": ["4f2a9c1", "9b1e0d2"]},
+  {"intention": "Tempokurven aus MIDI-Dateien ableiten", "turns": ["S20.1-4"], "commits": ["a1b2c3d"], "mode": "explorativ"},
+  {"intention": "Regionen per Drag & Drop verschieben", "reconstructed": true, "commits": ["7a9e8f4", "41de2f9"]}
+]}
 ```
 
-## Output format
+Turns are referenced as `S12` (whole session), `S12.3` (one turn) or `S12.3-9` (a range). Commits are the short hashes from the dossier.
 
-- Heading: "Arbeitsverlauf – LLM-Coding × <project name>"
-- Font: Garamond throughout
-- Table style: "List Table 1 Light" (Listentabelle 1 Hell) with columns: Nr., Datum, Modell, Modus und Umfang, Commits
-- Modell column: model display name (e.g. "Opus 4.6", "GPT-5.3")
-- Modus und Umfang column: interaction mode + active time (e.g. "autonom, ~30\u00a0min")
-- Commits column: topic line in 9pt Garamond, then commit hashes in 8pt gray monospace (Courier New)
-- Footer: total entry count, date range, project name
-- Use proper German umlauts (ä, ö, ü, ß) — do NOT use ae/oe/ue substitutions
-- Save to the project root directory
+The renderer computes the mode from the turns: **autonom** at 25 or more tool calls per prompt, **explorativ** when fewer than 5 % of tool calls edit files, **dialogisch** otherwise. Set `mode` only when the prompts clearly contradict the computed one.
+
+## 3. Render
+
+```
+python3 ~/.claude/skills/work-log/worklog.py render <run-dir> --output <project-root>/arbeitsverlauf.tex
+```
+
+- If it reports problems in `intentions.json`, fix them and render again.
+- Every warning about a linked commit in no intention needs a decision: assign the commit, or leave it out only when the linked turn clearly did not contribute (e.g. a match by edited files that is a coincidence).
+- If `pdflatex` is available, render once more with `--standalone --output <run-dir>/preview.tex` and compile it there to check that the table sets without errors.
+
+The output is a fragment for `\input` into a thesis and needs `\usepackage{booktabs,longtable,array}`. Rows are ordered by active time, reconstructed rows last.
+
+Finally tell the user the output path, the number of intentions and the period, and anything left out: skipped sources, linked commits not assigned, and how many commits in scope had no session.
