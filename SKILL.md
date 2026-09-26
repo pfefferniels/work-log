@@ -43,7 +43,7 @@ Aim for the level at which the researcher decided what to work on next.
 - Too coarse: the phrase could be a project title ("mpm-desk weiterentwickeln"), or it needs "und" to join goals that are unrelated.
 - Too fine: the phrase names one step of a larger goal ("Button-Farbe anpassen" within a UI rework), unless that step was all the researcher wanted at the time.
 - Issue bullets and numbered tasks are separate intentions when each is a goal of its own, and one intention when they are steps toward one result.
-- Housekeeping (renaming, README, dependency updates, merges) joins the intention it served. It stands alone only when the researcher pursued it for its own sake; related chores then share one row ("Skill veröffentlichen und einrichten").
+- Housekeeping (renaming, README, dependency updates, merges) joins the intention it served. It stands alone only when the researcher pursued it for its own sake; related chores then share one row ("Skill veröffentlicht und eingerichtet").
 - A commit may appear in several intentions when it bundles their results, which is common when a session ends with one "commit and push". Each turn belongs to one intention. A turn that genuinely served two may be listed in both, and its time is split between them.
 - Turns that belong to no intention (unrelated questions, abandoned attempts) are simply not assigned.
 
@@ -51,7 +51,7 @@ As a rough calibration, an intention spans a few to a few dozen turns and one to
 
 ### Wording
 
-German, as an infinitive phrase of 3–10 words that states the goal from the researcher's side, not what the model did. Verb-centred, no Nominalstil. Technical terms may stay English. Examples: "Undo und Redo im Editor ermöglichen", "Kontinuierliche Pedaldaten im Alignment berücksichtigen", "Abbildung zur Rollenproduktion nach neuer Vorlage umsetzen".
+German, in the past tense as a participle phrase of 3–10 words, stating the goal from the researcher's side, not what the model did. Every listed intention led to a commit, so the past form fits. Verb-centred, no Nominalstil. Technical terms may stay English. Examples: "Undo und Redo im Editor ermöglicht", "Kontinuierliche Pedaldaten im Alignment berücksichtigt", "Abbildung zur Rollenproduktion nach neuer Vorlage umgesetzt".
 
 ### Reconstructed intentions
 
@@ -63,9 +63,9 @@ Write `intentions.json` into the run directory:
 
 ```json
 {"intentions": [
-  {"intention": "Undo und Redo im Editor ermöglichen", "turns": ["S12.3-9", "S15"], "commits": ["4f2a9c1", "9b1e0d2"]},
-  {"intention": "Tempokurven aus MIDI-Dateien ableiten", "turns": ["S20.1-4"], "commits": ["a1b2c3d"], "mode": "explorativ"},
-  {"intention": "Regionen per Drag & Drop verschieben", "reconstructed": true, "commits": ["7a9e8f4", "41de2f9"]}
+  {"intention": "Undo und Redo im Editor ermöglicht", "turns": ["S12.3-9", "S15"], "commits": ["4f2a9c1", "9b1e0d2"]},
+  {"intention": "Tempokurven aus MIDI-Dateien abgeleitet", "turns": ["S20.1-4"], "commits": ["a1b2c3d"], "mode": "explorativ"},
+  {"intention": "Regionen per Drag & Drop verschiebbar gemacht", "reconstructed": true, "commits": ["7a9e8f4", "41de2f9"]}
 ]}
 ```
 
@@ -83,6 +83,6 @@ python3 ~/.claude/skills/work-log/worklog.py render <run-dir> --output <project-
 - Every warning about a linked commit in no intention needs a decision: assign the commit, or leave it out only when the linked turn clearly did not contribute (e.g. a match by edited files that is a coincidence).
 - If `pdflatex` is available, render once more with `--standalone --output <run-dir>/preview.tex` and compile it there to check that the table sets without errors.
 
-The output is a fragment for `\input` into a thesis and needs `\usepackage{booktabs,longtable,array}`. Rows are ordered by active time, reconstructed rows last.
+The output is a fragment for `\input` into a thesis and needs `\usepackage{booktabs,longtable,array}`. Rows are ordered by active time, reconstructed rows last. Where Zeitraum, Modell, Modus or Commits repeat the row above, the cell stays empty so that both read as one.
 
 Finally tell the user the output path, the number of intentions and the period, and anything left out: skipped sources, linked commits not assigned, and how many commits in scope had no session.

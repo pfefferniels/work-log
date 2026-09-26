@@ -4,16 +4,17 @@ A Claude Code skill that documents LLM-assisted coding as a LaTeX table, intende
 
 When AI is used in an academic context, its exact usage must be documented. The common approach, appending the full prompt and chat history, does not work well with coding agents like Claude Code or Codex, whose output is voluminous and mostly irrelevant for this purpose. This skill lists the **intentions** of the researcher instead: the goals pursued with the agent that ended in at least one git commit. An intention may span several sessions or occupy only part of one.
 
-| Nr. | Zeitraum | Intention | Modell | Modus und Umfang | Commits |
-|-----|----------|-----------|--------|------------------|---------|
+| Nr. | Zeitraum | Intention | Modell | Modus | Umfang | Commits |
+|-----|----------|-----------|--------|-------|--------|---------|
 
 - **Zeitraum**: first to last day of work on the intention, e.g. "22.–23.3.2026"
-- **Intention**: the goal, phrased from the researcher's side, e.g. "Undo und Redo im Editor ermöglichen"
+- **Intention**: the goal, phrased in the past tense from the researcher's side, e.g. "Undo und Redo im Editor ermöglicht"
 - **Modell**: the models that did the work, e.g. "Opus 4.6"
-- **Modus und Umfang**: interaction mode and active time, e.g. "autonom, ~30 min". Modes: *dialogisch* (back and forth), *autonom* (at least 25 tool calls per prompt), *explorativ* (under 5 % of tool calls edit files). Pauses of five minutes or more are not counted.
+- **Modus**: *dialogisch* (back and forth), *autonom* (at least 25 tool calls per prompt) or *explorativ* (under 5 % of tool calls edit files)
+- **Umfang**: active time, e.g. "~30 min". Pauses of five minutes or more are not counted.
 - **Commits**: short hashes of the commits that realized the intention
 
-Rows are sorted by active time. Commits from sessions whose transcripts Claude Code has already deleted can be listed in a separate block, reconstructed from the commit messages.
+Rows are sorted by active time. Where Zeitraum, Modell, Modus or Commits repeat the row above, the cell is left empty so that the two read as one. Commits from sessions whose transcripts Claude Code has already deleted can be listed in a separate block, reconstructed from the commit messages.
 
 ## How it works
 

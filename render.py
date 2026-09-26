@@ -20,8 +20,25 @@ LATEX_SPECIALS = str.maketrans({
     "\\": r"\textbackslash{}", "&": r"\&", "%": r"\%", "$": r"\$", "#": r"\#", "_": r"\_", "{": r"\{",
     "}": r"\}", "~": r"\textasciitilde{}", "^": r"\textasciicircum{}", "<": r"\textless{}", ">": r"\textgreater{}",
 })
-COLUMNS = (("Nr.", 0.05, "raggedleft"), ("Zeitraum", 0.14, "raggedright"), ("Intention", 0.31, "raggedright"),
-           ("Modell", 0.12, "raggedright"), ("Modus und Umfang", 0.15, "raggedright"), ("Commits", 0.23, "raggedright"))
+
+
+@dataclass(frozen=True)
+class Column:
+    name: str
+    width: float
+    align: str
+    joins_repeats: bool
+
+
+COLUMNS = (
+    Column("Nr.", 0.05, "raggedleft", False),
+    Column("Zeitraum", 0.13, "raggedright", True),
+    Column("Intention", 0.28, "raggedright", False),
+    Column("Modell", 0.11, "raggedright", True),
+    Column("Modus", 0.11, "raggedright", True),
+    Column("Umfang", 0.10, "raggedright", False),
+    Column("Commits", 0.22, "raggedright", True),
+)
 
 
 class InvalidIntentions(Exception):
@@ -228,7 +245,7 @@ def latex(text: str) -> str:
 def table(all_rows: Sequence[Row], scope_name: str, tombstone_count: int) -> str:
     regular = sorted((r for r in all_rows if not r.reconstructed), key=attrgetter("active_seconds"), reverse=True)
     reconstructed = sorted((r for r in all_rows if r.reconstructed), key=attrgetter("first"))
-    header = " & ".join(name for name, _, _ in COLUMNS) + r" \\"
+    header = line([column.name for column in COLUMNS])
     summary = r" \textbar{} ".join(filter(None, [
         f"{len(all_rows)} Intentionen",
         period(min(r.first for r in all_rows), max(r.last for r in all_rows)) if all_rows else "",
@@ -237,17 +254,17 @@ def table(all_rows: Sequence[Row], scope_name: str, tombstone_count: int) -> str
     return "\n".join([
         f"% Arbeitsverlauf – LLM-Coding × {scope_name}, erzeugt mit work-log",
         r"% Benötigt \usepackage{booktabs,longtable,array}",
-        r"{\small",
+        r"{\small\setlength{\tabcolsep}{4pt}",
         r"\begin{longtable}{@{}" + "".join(
-            column_spec(width, align, separators=1 if number in (0, len(COLUMNS) - 1) else 2)
-            for number, (_, width, align) in enumerate(COLUMNS)
+            column_spec(column, separators=1 if number in (0, len(COLUMNS) - 1) else 2)
+            for number, column in enumerate(COLUMNS)
         ) + "@{}}",
         r"\toprule", header, r"\midrule", r"\endfirsthead",
         r"\toprule", header, r"\midrule", r"\endhead",
         r"\bottomrule", r"\endlastfoot",
-        *(table_row(number, r) for number, r in enumerate(regular, 1)),
+        *map(line, joined([cells(number, r) for number, r in enumerate(regular, 1)])),
         *(reconstructed_note(tombstone_count) if reconstructed else []),
-        *(table_row(number, r) for number, r in enumerate(reconstructed, len(regular) + 1)),
+        *map(line, joined([cells(number, r) for number, r in enumerate(reconstructed, len(regular) + 1)])),
         r"\end{longtable}",
         rf"\par\noindent{{\footnotesize {summary}\par}}",
         "}",
@@ -258,19 +275,32 @@ def table(all_rows: Sequence[Row], scope_name: str, tombstone_count: int) -> str
 def reconstructed_note(tombstone_count: int) -> list[str]:
     sessions = f"{tombstone_count} Sitzungen, deren Verlauf gelöscht wurde" if tombstone_count else "Sitzungen ohne erhaltenen Verlauf"
     return [r"\midrule",
-            rf"\multicolumn{{6}}{{@{{}}p{{\linewidth}}@{{}}}}{{\footnotesize\itshape Rekonstruiert aus Commits: "
-            rf"{sessions}; Modell und Umfang unbekannt.}} \\"]
+            rf"\multicolumn{{{len(COLUMNS)}}}{{@{{}}p{{\linewidth}}@{{}}}}{{\footnotesize\itshape Rekonstruiert aus "
+            rf"Commits: {sessions}; Modell, Modus und Umfang unbekannt.}} \\"]
 
 
-def column_spec(width: float, align: str, separators: int) -> str:
+def column_spec(column: Column, separators: int) -> str:
     """A share of the line width; the outer columns lose one column separator to `@{}`, the inner ones two."""
-    return rf">{{\{align}\arraybackslash}}p{{\dimexpr {width}\linewidth-{separators}\tabcolsep\relax}}"
+    return rf">{{\{column.align}\arraybackslash}}p{{\dimexpr {column.width}\linewidth-{separators}\tabcolsep\relax}}"
 
 
-def table_row(number: int, r: Row) -> str:
-    mode_and_extent = "" if r.reconstructed else f"{r.mode}, {extent(r.active_seconds)}"
-    models = r"\newline ".join(map(latex, r.models))
-    return " & ".join([str(number), r.period, latex(r.intention), models, mode_and_extent, commit_cell(r)]) + r" \\"
+def cells(number: int, r: Row) -> list[str]:
+    return [
+        str(number), r.period, latex(r.intention), r"\newline ".join(map(latex, r.models)),
+        r.mode, "" if r.reconstructed else extent(r.active_seconds), commit_cell(r),
+    ]
+
+
+def joined(rows_cells: Sequence[list[str]]) -> list[list[str]]:
+    """A cell that repeats the one above it is left empty, so that the two read as one cell."""
+    return [
+        ["" if column.joins_repeats and cell == above else cell for column, cell, above in zip(COLUMNS, current, previous)]
+        for previous, current in zip([[None] * len(COLUMNS), *rows_cells], rows_cells)
+    ]
+
+
+def line(row_cells: Sequence[str]) -> str:
+    return " & ".join(row_cells) + r" \\"
 
 
 def commit_cell(r: Row) -> str:
