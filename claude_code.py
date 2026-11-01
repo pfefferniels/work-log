@@ -21,6 +21,8 @@ SHELL_TOOLS = frozenset({"Bash", "PowerShell"})
 NOT_TYPED = (
     "<local-command", "<task-notification", "<system-reminder", "<bash-", "Caveat:",
     "[Request interrupted", "This session is being continued", "Base directory for this skill",
+    "Another Claude session sent a message", "<teammate-message", "<agent-message", "<cross-session-message",
+    "[Subagent hand-back]", "Stop hook feedback:",
 )
 SESSION_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 COMMAND_NAME = re.compile(r"<command-name>/?([^<]+)</command-name>")
