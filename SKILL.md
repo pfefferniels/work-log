@@ -95,4 +95,4 @@ When the user wants the prompts themselves published, run with the same scope op
 python3 ~/.claude/skills/work-log/worklog.py prompts [--repo PATH ...] [--all] [--name NAME] [--since YYYY-MM-DD] --out <prompts-repo>
 ```
 
-It writes one Markdown file per day, with obvious slips corrected in square brackets by a small model and checked by the script (see README). Tell the user the folder, the number of prompts and days, how many proposed corrections were dropped, and that `emendations.json` deserves a look before publishing.
+It writes one Markdown file per day as a clean reading text: slips and grammar corrected in square brackets, punctuation corrected and interjections omitted without a mark, all proposed by a small model and checked by the script (see README). Tell the user the folder, the number of prompts and days, how many proposed corrections were dropped, and that `emendations.json` deserves a look before publishing.

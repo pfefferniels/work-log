@@ -29,12 +29,17 @@ given separately where the transcript records it) indicate how much work followe
 
 ## Editorial principles
 
-- Prompts are reproduced in full. Many were dictated or typed in haste. Obvious slips (misspellings, missing \
-or doubled words, dictation errors) were corrected by a small language model. A script admits only small, local \
-corrections of words that occur in the prompt, so that no correction rewords a passage. Every corrected or added \
-word stands in square brackets. Register, capitalization, punctuation and the mix of languages are left as typed.
-- `emendations.json` lists every correction as a pair of the words as typed and their correction, with the \
-model that proposed it. The original reading of a bracketed passage can be found there.
+- Prompts are given as a clean reading text. Many were dictated or typed in haste. A small language model \
+corrected misspellings, dictation errors, missing or doubled words and faulty grammar, and wrote out colloquial \
+contractions ("wanna" as "want to"). A script admits only small, local corrections of words that occur in the \
+prompt, so that no correction rewords a passage. Every corrected or added word stands in square brackets.
+- Punctuation was corrected without a mark. Interjections, fillers, exclamations of frustration and emoticons \
+("hm", "oh damn it", ":D") are omitted without a mark. The script admits an omission only when every omitted \
+word is such an exclamation.
+- Capitalization, established abbreviations and the mix of languages are left as typed.
+- `emendations.json` lists every correction and omission as a pair of the words as typed and their correction, \
+with the model that proposed it. The original reading of a bracketed passage, and the place of an omission, can \
+be found there.
 - Pasted passages are shown collapsed and left uncorrected. Only pastes of several lines can be recognized; \
 shorter ones are treated as typed.
 - Square brackets that were part of a prompt as typed cannot be told apart from editorial ones; \
