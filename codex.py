@@ -87,7 +87,8 @@ def rollout_events(record: dict, model: str, typed: bool) -> Iterator[Event]:
             yield Prompt(at, text)
         case "event_msg", "token_count":
             usage = (payload.get("info") or {}).get("last_token_usage") or {}
-            yield Reply(at, f"codex:{at.isoformat()}", model, usage.get("output_tokens") or 0)
+            yield Reply(at, f"codex:{at.isoformat()}", model, usage.get("output_tokens") or 0,
+                        usage.get("reasoning_output_tokens"))
         case "response_item", "function_call" | "custom_tool_call" | "local_shell_call":
             yield from tool_events(at, payload)
         case _:

@@ -113,11 +113,27 @@ def session_block(s: Session, label: str, linked: bool, by_turn: dict) -> str:
 
 
 def turn_block(turn: Turn, label: str, links: Sequence[Link]) -> str:
-    facts = f"{turn.active_seconds // 60} min, {turn.tool_calls} tools ({turn.edits} edits), {turn.output_tokens // 1000}k tokens"
-    lines = [f"**{label}** {stamp(turn.start)} · {facts}", f"> {shortened(turn.prompt) or '(no prompt)'}"]
+    lines = [f"**{label}** {stamp(turn.start)} · {figures(turn)}", f"> {shortened(turn.prompt) or '(no prompt)'}"]
     commits = [f"- commit {l.commit.short} · {l.commit.repo} · {stamp(l.commit.authored)} · {l.commit.subject} ({l.evidence})"
                for l in sorted(links, key=lambda l: l.commit.authored)]
     return "\n".join([*lines, *commits, ""])
+
+
+def figures(turn: Turn) -> str:
+    thinking = f" ({amount(turn.thinking_tokens)} thinking)" if turn.thinking_tokens else ""
+    return (f"{minutes(turn.active_seconds)}, {turn.tool_calls} tools ({turn.edits} edits), "
+            f"{amount(turn.output_tokens)} tokens{thinking}")
+
+
+def minutes(seconds: int) -> str:
+    whole = round(seconds / 60)
+    return f"{whole} min" if whole else "<1 min"
+
+
+def amount(count: int) -> str:
+    if count < 1000:
+        return str(count)
+    return f"{count / 1000:.1f}k" if count < 10_000 else f"{round(count / 1000)}k"
 
 
 def overview(scope: Scope, selection: Selection, notes: Sequence[str], paths: Sequence[Path],
@@ -171,7 +187,8 @@ def index(scope: Scope, selection: Selection, labels: dict[str, str]) -> dict:
 def turn_facts(turn: Turn) -> dict:
     return {
         "start": turn.start.isoformat(), "end": turn.end.isoformat(), "active_seconds": turn.active_seconds,
-        "output_tokens": turn.output_tokens, "models": list(turn.models), "tool_calls": turn.tool_calls,
+        "output_tokens": turn.output_tokens, "thinking_tokens": turn.thinking_tokens,
+        "models": list(turn.models), "tool_calls": turn.tool_calls,
         "edits": turn.edits, "prompted": bool(turn.prompt),
     }
 

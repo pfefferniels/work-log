@@ -27,6 +27,7 @@ class Turn:
     edits: int
     files: tuple[str, ...]
     commit_calls: tuple[CommitCall, ...]
+    thinking_tokens: int | None = None
 
 
 @dataclass(frozen=True)

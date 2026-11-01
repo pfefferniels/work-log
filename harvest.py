@@ -17,7 +17,7 @@ import session
 from session import Session
 
 CACHE = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "work-log"
-PARSER_VERSION = "2"
+PARSER_VERSION = "3"
 
 
 @dataclass(frozen=True)

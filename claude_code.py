@@ -195,7 +195,7 @@ def reply_events(message: dict, at: datetime) -> Iterator[Event]:
     model = message.get("model") or ""
     usage = message.get("usage") or {}
     yield Reply(at, message.get("id") or at.isoformat(), "" if model == "<synthetic>" else model,
-                usage.get("output_tokens") or 0)
+                usage.get("output_tokens") or 0, (usage.get("output_tokens_details") or {}).get("thinking_tokens"))
     uses = [part for part in message.get("content") or [] if isinstance(part, dict) and part.get("type") == "tool_use"]
     yield from (ToolCall(at, use.get("name", ""), edited_path(use)) for use in uses)
     yield from shell_commits(at, uses)

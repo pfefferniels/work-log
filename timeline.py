@@ -32,6 +32,7 @@ class Reply:
     message_id: str
     model: str
     output_tokens: int
+    thinking_tokens: int | None
 
 
 @dataclass(frozen=True)
@@ -87,6 +88,7 @@ def make_turn(events: Sequence[Event], previous_end: datetime | None) -> Turn:
         edits=len(edits),
         files=tuple(sorted({edit.path for edit in edits if edit.path})),
         commit_calls=tuple(event for event in events if isinstance(event, CommitCall)),
+        thinking_tokens=thinking_tokens(replies),
     )
 
 
@@ -96,6 +98,16 @@ def active_time(times: Sequence[datetime]) -> timedelta:
 
 
 def output_tokens(replies: Iterable[Reply]) -> int:
+    return sum(max(reply.output_tokens for reply in message) for message in by_message(replies))
+
+
+def thinking_tokens(replies: Iterable[Reply]) -> int | None:
+    """Part of the output tokens; None when no reply reports it, as in transcripts written before it was logged."""
+    reported = [counts for message in by_message(replies)
+                if (counts := [reply.thinking_tokens for reply in message if reply.thinking_tokens is not None])]
+    return sum(map(max, reported)) if reported else None
+
+
+def by_message(replies: Iterable[Reply]) -> list[list[Reply]]:
     """A streamed reply can be logged as several lines of one message, so count each message once."""
-    by_message = groupby(sorted(replies, key=attrgetter("message_id")), key=attrgetter("message_id"))
-    return sum(max(reply.output_tokens for reply in group) for _, group in by_message)
+    return [list(group) for _, group in groupby(sorted(replies, key=attrgetter("message_id")), key=attrgetter("message_id"))]
