@@ -70,21 +70,32 @@ def parse_transcript(transcript: claude_code.Transcript) -> str | None:
 def cloud_sessions(db: sqlite3.Connection) -> tuple[list[Session], list[str]]:
     known = dict(db.execute("select key, signature from parsed where key like 'cloud:%'"))
     try:
-        current = refresh_cloud(db, known)
+        current, notes = refresh_cloud(db, known)
     except (cloud.CloudUnavailable, OSError) as error:
         stored = cached(db, known)
         return stored, [f"Cloud sessions could not be refreshed ({error}); {len(stored)} taken from the cache."]
-    return cached(db, current), []
+    return cached(db, current), notes
 
 
-def refresh_cloud(db: sqlite3.Connection, known: dict[str, str]) -> dict[str, dict]:
+def refresh_cloud(db: sqlite3.Connection, known: dict[str, str]) -> tuple[dict[str, dict], list[str]]:
     client = cloud.Client(cloud.keychain_token())
     summaries = {f"cloud:{summary['id']}": summary for summary in client.summaries()}
     signatures = {key: f"{PARSER_VERSION}|{summary.get('last_event_at')}" for key, summary in summaries.items()}
     stale = [key for key in summaries if known.get(key) != signatures[key]]
     report(f"Cloud: {len(summaries)} sessions, {len(stale)} to fetch")
-    store(db, ((key, signatures[key], dumps_or_none(cloud.read(client, summaries[key]))) for key in stale))
-    return summaries
+    rows = [fetched(client, key, summaries[key], signatures[key]) for key in stale]
+    store(db, filter(None, rows))
+    missed = rows.count(None)
+    return summaries, [f"{missed} cloud sessions could not be fetched; an earlier copy is used where one is cached."] if missed else []
+
+
+def fetched(client: cloud.Client, key: str, summary: dict, signature: str) -> tuple[str, str, str | None] | None:
+    """The cache row of a cloud session, or None when the API failed; the session is tried again on the next run."""
+    try:
+        return key, signature, dumps_or_none(cloud.read(client, summary))
+    except OSError as error:
+        report(f"Cloud session {summary['id']} not fetched ({error})")
+        return None
 
 
 def store(db: sqlite3.Connection, rows: Iterable[tuple[str, str, str | None]]) -> None:
