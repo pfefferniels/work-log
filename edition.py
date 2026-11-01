@@ -30,12 +30,12 @@ given separately where the transcript records it) indicate how much work followe
 ## Editorial principles
 
 - Prompts are given as a clean reading text. Many were dictated or typed in haste. A small language model \
-corrected misspellings, dictation errors, missing or doubled words and faulty grammar, and wrote out colloquial \
-contractions ("wanna" as "want to"). A script admits only small, local corrections of words that occur in the \
-prompt, so that no correction rewords a passage. Every corrected or added word stands in square brackets.
-- Punctuation was corrected without a mark. Interjections, fillers, exclamations of frustration and emoticons \
-("hm", "oh damn it", ":D") are omitted without a mark. The script admits an omission only when every omitted \
-word is such an exclamation.
+corrected misspellings, dictation errors, missing or doubled words, faulty grammar and punctuation, and wrote out \
+colloquial contractions ("wanna" as "want to"). A script admits only small, local corrections of words that occur \
+in the prompt, so that no correction rewords a passage. Every corrected or added word and punctuation mark stands \
+in square brackets; where a mark was removed, the word it stood on is bracketed.
+- Interjections, fillers, exclamations of frustration and emoticons ("hm", "oh damn it", ":D") are omitted and \
+marked with [...]. The script admits an omission only when every omitted word is such an exclamation.
 - Capitalization, established abbreviations and the mix of languages are left as typed.
 - `emendations.json` lists every correction and omission as a pair of the words as typed and their correction, \
 with the model that proposed it. The original reading of a bracketed passage, and the place of an omission, can \

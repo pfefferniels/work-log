@@ -2,7 +2,7 @@
 
 The model only proposes pairs of a reading (the words as typed) and its correction. A proposal is kept when
 its reading occurs after the previous one and it changes no more than a few words, so the edited text differs
-from the typed one only inside square brackets and where an interjection was omitted.
+from the typed one only inside square brackets.
 """
 
 import hashlib
@@ -13,6 +13,7 @@ import sys
 from collections.abc import Iterable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, replace
+from difflib import SequenceMatcher
 from functools import partial, reduce
 from itertools import takewhile
 from pathlib import Path
@@ -23,6 +24,7 @@ MIN_WORDS = 3
 MAX_READING_WORDS = 4
 MAX_ADDED_WORDS = 2
 MAX_OMITTED_WORDS = 4
+OMISSION_MARK = "[...]"
 EXCLAMATION = (r"h+ä+h*|h+m+|ä+h+m*|e+h*m+|u+h*m+|u+h+|n+ä+h*|o+h+|a+h+|aha|omg|wtf|lol|(?:ha)+h?|(?:he)+h?"
                r"|g+r+|gr+m+p+f+|ar+g+h+|u+g+h+"
                r"|(?:god)?damn(?: it)?|shit|fuck(?: it)?|verdammt(?: nochmal)?|mist|schei(?:ß|ss)e"
@@ -132,9 +134,17 @@ def advance(cursor: Cursor, emendation: Emendation) -> Cursor:
     if found is None:
         return replace(cursor, rejected=(*cursor.rejected, emendation))
     if omission(emendation):
-        return Cursor(cursor.done + cursor.rest[:found.start()], cursor.rest[found.end():].lstrip(" "), cursor.rejected)
+        return omitted(cursor, found)
     return Cursor(cursor.done + cursor.rest[:found.start()] + bracketed(emendation), cursor.rest[found.end():],
                   cursor.rejected)
+
+
+def omitted(cursor: Cursor, found: re.Match) -> Cursor:
+    """An omission leaves the mark in its place; omissions in a row share one."""
+    between, rest = cursor.rest[:found.start()], cursor.rest[found.end():]
+    if not between.strip() and cursor.done.endswith(OMISSION_MARK):
+        return Cursor(cursor.done, rest, cursor.rejected)
+    return Cursor(cursor.done + between + OMISSION_MARK, rest, cursor.rejected)
 
 
 def omission(emendation: Emendation) -> bool:
@@ -159,18 +169,27 @@ def located(reading: str, text: str) -> re.Match | None:
 
 
 def bracketed(emendation: Emendation) -> str:
-    """The correction with its changed words in brackets. A change of punctuation alone is not marked; a dropped
+    """The correction with its changed words, and the changed punctuation of the others, in brackets. A dropped
     word brackets its surviving neighbour."""
     reading, correction = emendation.reading.split(), emendation.correction.split()
     letters, corrected = list(map(bare, reading)), list(map(bare, correction))
-    if letters == corrected:
-        return " ".join(correction)
     head = shared_length(letters, corrected)
     tail = shared_length(letters[head:][::-1], corrected[head:][::-1])
-    if head + tail == len(correction):
+    if letters != corrected and head + tail == len(correction):
         head, tail = (head - 1, tail) if head else (head, tail - 1)
     changed = correction[head:len(correction) - tail]
-    return " ".join([*correction[:head], f"[{' '.join(changed)}]", *correction[len(correction) - tail:]])
+    before = map(repunctuated, reading[:head], correction[:head])
+    after = map(repunctuated, reading[len(reading) - tail:], correction[len(correction) - tail:])
+    return " ".join([*before, *([f"[{' '.join(changed)}]"] if changed else []), *after])
+
+
+def repunctuated(typed: str, corrected: str) -> str:
+    """The corrected word with each added or changed mark in brackets; a removed mark brackets the whole word."""
+    steps = SequenceMatcher(None, typed, corrected, autojunk=False).get_opcodes()
+    if any(step == "delete" for step, *_ in steps):
+        return f"[{corrected}]"
+    return "".join(corrected[start:end] if step == "equal" else f"[{corrected[start:end]}]"
+                   for step, _, _, start, end in steps)
 
 
 def bare(word: str) -> str:
