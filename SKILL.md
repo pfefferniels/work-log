@@ -86,3 +86,13 @@ python3 ~/.claude/skills/work-log/worklog.py render <run-dir> --output <project-
 The output is a fragment for `\input` into a thesis and needs `\usepackage{booktabs,longtable,array}`. Rows are ordered by active time, reconstructed rows last. Where Zeitraum, Modell, Modus or Commits repeat the row above, the cell stays empty so that both read as one.
 
 Finally tell the user the output path, the number of intentions and the period, and anything left out: skipped sources, linked commits not assigned, and how many commits in scope had no session.
+
+## 4. Publish the prompts (on request)
+
+When the user wants the prompts themselves published, run with the same scope options:
+
+```
+python3 ~/.claude/skills/work-log/worklog.py prompts [--repo PATH ...] [--all] [--name NAME] [--since YYYY-MM-DD] --out <prompts-repo>
+```
+
+It writes one Markdown file per day, with obvious slips corrected in square brackets by a small model and checked by the script (see README). Tell the user the folder, the number of prompts and days, how many proposed corrections were dropped, and that `emendations.json` deserves a look before publishing.

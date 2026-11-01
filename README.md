@@ -50,6 +50,22 @@ python3 worklog.py dossier --repo ~/Projects/a --repo ~/Projects/b --name "Disse
 python3 worklog.py render ~/.cache/work-log/runs/Dissertation --output arbeitsverlauf.tex
 ```
 
+## Publishing the prompts
+
+The prompts themselves can be published alongside the table, for instance in a repository of their own:
+
+```bash
+python3 worklog.py prompts --repo ~/Projects/a --out ~/Projects/prompts
+```
+
+This writes one Markdown file per day into a folder named after the scope. Each prompt appears in full. The reply is left out, and the figures of the turn stand in for it: active time, tool calls, file edits and output tokens, with thinking tokens where the transcript records them.
+
+Prompts are often dictated or typed in haste. A small model (Haiku 5.5 by default) proposes corrections of obvious slips, and the script admits only small, local corrections of words that occur in the prompt (at most four words replaced and two added, in order), so that no correction rewords a passage. Corrected or added words stand in square brackets. Admitted corrections are kept in `emendations.json` in the output directory, which records the original reading of every bracketed passage. Each passage goes to the model once, so a later run leaves published text unchanged. To reject a correction, delete it from its entry and run again.
+
+Pasted passages are recognized through Claude Code's prompt history (`~/.claude/history.jsonl`), which marks pastes of several lines. They are shown collapsed and never corrected. Shorter pastes leave no trace there and are treated as typed.
+
+If the output directory has no `README.md`, one stating these editorial principles is written. The model reads each passage without the rest of the session, so its corrections deserve a look before publication.
+
 ## Cloud sessions
 
 Cloud sessions are read from an undocumented beta API (see `cloud-sessions-api.md`) with the OAuth token Claude Code keeps in the macOS keychain. Claude Code's auto mode blocks such access by default. To allow it for this skill, add a rule to `~/.claude/settings.json`:
